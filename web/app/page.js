@@ -1,15 +1,21 @@
 import Link from "next/link";
 import {sanityClient} from "../lib/sanityClient";
 
-const postsQuery = `*[_type == "post"] | order(publishedAt desc) {
+const postsQuery = `*[_type == "post" && ($category == "" || $category in categories[]->title)] | order(publishedAt desc) {
   title,
   slug,
   excerpt,
   "authorName": author->name
 }`;
 
-export default async function Home() {
-  const posts = await sanityClient.fetch(postsQuery);
+const categoriesQuery = `*[_type == "category"] | order(title asc) {title}`;
+
+export default async function Home({searchParams}) {
+  const {category = ""} = await searchParams;
+  const [posts, categories] = await Promise.all([
+    sanityClient.fetch(postsQuery, {category}),
+    sanityClient.fetch(categoriesQuery),
+  ]);
 
   return (
     <main className="mx-auto min-h-screen max-w-3xl px-6 py-16">
@@ -22,6 +28,27 @@ export default async function Home() {
           Structured content published from Sanity and rendered by Next.js.
         </p>
       </header>
+
+      <form className="mb-10 flex items-end gap-3" method="get">
+        <label className="flex flex-col gap-2 text-sm font-semibold text-zinc-700">
+          Filter by category
+          <select
+            name="category"
+            defaultValue={category}
+            className="rounded border border-zinc-300 bg-white px-3 py-2 font-normal"
+          >
+            <option value="">All categories</option>
+            {categories.map((item) => (
+              <option key={item.title} value={item.title}>
+                {item.title}
+              </option>
+            ))}
+          </select>
+        </label>
+        <button className="rounded bg-zinc-900 px-4 py-2 text-sm font-semibold text-white" type="submit">
+          Apply
+        </button>
+      </form>
 
       <section className="space-y-6" aria-label="Blog posts">
         {posts.map((post) => (
